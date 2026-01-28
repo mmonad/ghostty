@@ -517,12 +517,18 @@ pub const Surface = struct {
         }
 
         // If we have a command from the options then we set it.
+        // If command is null, explicitly clear config.command to use Manual backend.
         if (opts.command) |c_command| {
             const cmd = std.mem.sliceTo(c_command, 0);
             if (cmd.len > 0) {
+                log.info("embedded.Surface.init: opts.command is SET to '{s}'", .{cmd});
                 config.command = .{ .shell = cmd };
                 config.@"wait-after-command" = true;
             }
+        } else {
+            // No command specified - clear it so Surface.zig uses Manual backend
+            log.info("embedded.Surface.init: opts.command is NULL, setting config.command = null", .{});
+            config.command = null;
         }
 
         // Apply any environment variables that were requested.

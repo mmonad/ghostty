@@ -619,15 +619,18 @@ pub fn init(
         errdefer io_mailbox.deinit(alloc);
 
         // Choose backend based on whether we have a command
-        // If no command is specified on iOS, use manual backend for external I/O (e.g., SSH)
+        // If no command is specified, use manual backend for external I/O (e.g., SSH)
         const io_backend: termio.Backend = backend: {
-            if (command == null and builtin.os.tag == .ios) {
-                // Use manual backend for iOS when no command is specified
+            log.info("Surface.init: command is {s}", .{if (command == null) "NULL" else "SET"});
+            if (command == null) {
+                // Use manual backend when no command is specified
                 // This allows external data sources like SSH to feed the terminal
+                log.info("Surface.init: using MANUAL backend", .{});
                 var io_manual = try termio.Manual.init(alloc, .{});
                 errdefer io_manual.deinit();
                 break :backend .{ .manual = io_manual };
             } else {
+                log.info("Surface.init: using EXEC backend", .{});
                 // Use exec backend with subprocess
                 var env = rt_surface.defaultTermioEnv() catch |err| env: {
                     // If an error occurs, we don't want to block surface startup.
