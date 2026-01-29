@@ -15,6 +15,7 @@ const input = @import("../input.zig");
 const internal_os = @import("../os/main.zig");
 const renderer = @import("../renderer.zig");
 const terminal = @import("../terminal/main.zig");
+const termio = @import("../termio.zig");
 const CoreApp = @import("../App.zig");
 const CoreInspector = @import("../inspector/main.zig").Inspector;
 const CoreSurface = @import("../Surface.zig");
@@ -418,6 +419,9 @@ pub const Surface = struct {
     /// that getTitle works without the implementer needing to save it.
     title: ?[:0]const u8 = null,
 
+    /// Callback for Manual backend to write data back to external source
+    write_cb: ?termio.Manual.WriteCb = null,
+
     /// Surface initialization options.
     pub const Options = extern struct {
         /// The platform that this surface is being initialized for and
@@ -459,6 +463,10 @@ pub const Surface = struct {
 
         /// Context for the new surface
         context: apprt.surface.NewSurfaceContext = .window,
+
+        /// Callback for Manual backend to write data back to external source
+        /// (e.g., cursor position response for SSH connections)
+        write_cb: ?termio.Manual.WriteCb = null,
     };
 
     pub fn init(self: *Surface, app: *App, opts: Options) !void {
@@ -473,6 +481,7 @@ pub const Surface = struct {
             },
             .size = .{ .width = 800, .height = 600 },
             .cursor_pos = .{ .x = -1, .y = -1 },
+            .write_cb = opts.write_cb,
         };
 
         // Add ourselves to the list of surfaces on the app.
@@ -631,6 +640,15 @@ pub const Surface = struct {
 
     pub fn rtApp(self: *const Surface) *App {
         return self.app;
+    }
+
+    /// Get the Manual backend configuration for this surface.
+    /// Returns the write callback and userdata for terminal responses.
+    pub fn getManualBackendConfig(self: *const Surface) termio.Manual.Config {
+        return .{
+            .write_cb = self.write_cb,
+            .userdata = self.userdata,
+        };
     }
 
     pub fn close(self: *const Surface, process_alive: bool) void {

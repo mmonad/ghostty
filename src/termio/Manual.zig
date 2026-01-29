@@ -1,6 +1,9 @@
 //! Manual backend for terminal I/O that doesn't spawn a subprocess.
 //! This is used for scenarios where terminal output comes from an external
 //! source (e.g., SSH connection) rather than a local PTY.
+//!
+//! When the terminal needs to send data back (e.g., cursor position response),
+//! the write_cb callback is invoked if set.
 const Manual = @This();
 
 const std = @import("std");
@@ -11,11 +14,21 @@ const termio = @import("../termio.zig");
 
 const log = std.log.scoped(.io_manual);
 
-// No state needed for manual backend
-_placeholder: u8 = 0,
+/// Callback type for writing data back to the external source.
+/// NOTE: This type must match `ghostty_surface_write_cb` in ghostty.h
+pub const WriteCb = *const fn (?*anyopaque, [*]const u8, usize) callconv(.c) void;
+
+/// Write callback - called when terminal needs to send data back
+write_cb: ?WriteCb,
+
+/// Userdata passed to write callback
+userdata: ?*anyopaque,
 
 pub const Config = struct {
-    // No configuration needed
+    /// Callback for writing data back to external source
+    write_cb: ?WriteCb = null,
+    /// Userdata passed to write callback
+    userdata: ?*anyopaque = null,
 };
 
 pub const ThreadData = struct {
@@ -32,8 +45,10 @@ pub fn init(
     cfg: Config,
 ) !Manual {
     _ = alloc;
-    _ = cfg;
-    return .{};
+    return .{
+        .write_cb = cfg.write_cb,
+        .userdata = cfg.userdata,
+    };
 }
 
 pub fn deinit(self: *Manual) void {
@@ -91,6 +106,14 @@ pub fn resize(
     // The external application handles terminal size
 }
 
+/// Queue data to be written back to the external source.
+/// This is called when the terminal needs to send responses (e.g., cursor position).
+///
+/// Note: The `linefeed` parameter is ignored because terminal responses use explicit
+/// escape sequences and don't require LF→CRLF translation.
+///
+/// THREADING: This is called from the termio thread. The callback implementation
+/// should be thread-safe (e.g., dispatch to main thread if needed).
 pub fn queueWrite(
     self: *Manual,
     alloc: Allocator,
@@ -98,13 +121,16 @@ pub fn queueWrite(
     data: []const u8,
     linefeed: bool,
 ) !void {
-    _ = self;
     _ = alloc;
     _ = td;
     _ = linefeed;
-    // In manual mode, writes are handled externally
-    // The application should capture writes via a callback
-    log.debug("manual backend queueWrite called with {} bytes", .{data.len});
+
+    if (self.write_cb) |cb| {
+        log.debug("manual backend queueWrite: sending {} bytes via callback", .{data.len});
+        cb(self.userdata, data.ptr, data.len);
+    } else {
+        log.debug("manual backend queueWrite: {} bytes (no callback set)", .{data.len});
+    }
 }
 
 pub fn changeConfig(self: *Manual, config: *termio.DerivedConfig) void {

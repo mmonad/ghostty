@@ -626,7 +626,15 @@ pub fn init(
                 // Use manual backend when no command is specified
                 // This allows external data sources like SSH to feed the terminal
                 log.info("Surface.init: using MANUAL backend", .{});
-                var io_manual = try termio.Manual.init(alloc, .{});
+
+                // Get the manual backend config from the runtime surface
+                // This includes the write callback for terminal responses (e.g., cursor position)
+                const manual_config = if (@hasDecl(apprt.runtime.Surface, "getManualBackendConfig"))
+                    rt_surface.getManualBackendConfig()
+                else
+                    termio.Manual.Config{};
+
+                var io_manual = try termio.Manual.init(alloc, manual_config);
                 errdefer io_manual.deinit();
                 break :backend .{ .manual = io_manual };
             } else {

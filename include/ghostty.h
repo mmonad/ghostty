@@ -437,6 +437,16 @@ typedef enum {
   GHOSTTY_SURFACE_CONTEXT_SPLIT = 2,
 } ghostty_surface_context_e;
 
+// Callback for terminal write output (used by Manual backend for SSH/external I/O).
+// Called when the terminal needs to send data back to the external source
+// (e.g., cursor position response, device attributes, etc.)
+//
+// THREADING: This callback is invoked from the termio thread, NOT the main thread.
+// The implementation should be thread-safe (e.g., dispatch to main thread if needed).
+typedef void (*ghostty_surface_write_cb)(void* userdata,
+                                         const char* data,
+                                         size_t len);
+
 typedef struct {
   ghostty_platform_e platform_tag;
   ghostty_platform_u platform;
@@ -450,6 +460,8 @@ typedef struct {
   const char* initial_input;
   bool wait_after_command;
   ghostty_surface_context_e context;
+  // Callback for Manual backend to send terminal responses back to external source
+  ghostty_surface_write_cb write_cb;
 } ghostty_surface_config_s;
 
 typedef struct {
