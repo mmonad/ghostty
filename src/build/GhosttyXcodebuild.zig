@@ -39,6 +39,9 @@ pub fn init(
         // add anything.
         .universal => null,
 
+        // iOS-only target doesn't build macOS app
+        .ios => null,
+
         // Native we need to override the architecture in the Xcode
         // project with the -arch flag.
         .native => switch (builtin.cpu.arch) {

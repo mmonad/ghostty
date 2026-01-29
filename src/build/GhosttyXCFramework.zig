@@ -77,6 +77,19 @@ pub fn init(
                 },
             },
 
+            .ios => &.{
+                .{
+                    .library = ios.output,
+                    .headers = b.path("include"),
+                    .dsym = ios.dsym,
+                },
+                .{
+                    .library = ios_sim.output,
+                    .headers = b.path("include"),
+                    .dsym = ios_sim.dsym,
+                },
+            },
+
             .native => &.{.{
                 .library = macos_native.output,
                 .headers = b.path("include"),
